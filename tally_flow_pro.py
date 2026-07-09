@@ -260,6 +260,18 @@ def extract_email(tally_data):
     return None
 
 
+@app.route('/test-email', methods=['GET'])
+def test_email():
+    """Isolated test: send a simple email."""
+    import time
+    start = time.time()
+    success = send_email("Test from Railway", "If you see this, SMTP works from Railway.", "fitgearlove@gmail.com")
+    return jsonify({
+        "email_sent": success,
+        "time_seconds": round(time.time() - start, 2)
+    })
+
+
 @app.route('/test-groq', methods=['GET'])
 def test_groq():
     """Isolated test: call Groq and return timing."""
