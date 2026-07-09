@@ -1,0 +1,17 @@
+node_modules/
+.git/
+.DS_Store
+*.mp4
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.csv
+dist/
+build/
+# Ignore archive or log files
+*.log
+*.zip
+*.tar.gz
+# Ignore specific massive business docs if they are just references
+# references/
