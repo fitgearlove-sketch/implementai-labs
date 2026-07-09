@@ -305,6 +305,22 @@ def tally_webhook():
     }), 200
 
 
+@app.route('/debug-env', methods=['GET'])
+def debug_env():
+    """Check which env vars are set (without exposing values)."""
+    return jsonify({
+        "groq_key_set": bool(GROQ_API_KEY),
+        "groq_key_prefix": GROQ_API_KEY[:7] + "..." if GROQ_API_KEY else "none",
+        "sender_email": SENDER_EMAIL,
+        "smtp_configured": bool(SENDER_PASSWORD),
+        "hubspot_configured": bool(HUBSPOT_API_KEY),
+        "model": MODEL_ID,
+        "port": PORT,
+        "calendly": bool(CALENDLY_URL),
+        "all_vars": {k: bool(v) for k, v in sorted(os.environ.items())}
+    }), 200
+
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "ok", "port": PORT}), 200
