@@ -260,6 +260,35 @@ def extract_email(tally_data):
     return None
 
 
+@app.route('/test-groq', methods=['GET'])
+def test_groq():
+    """Isolated test: call Groq and return timing."""
+    import time
+    start = time.time()
+    try:
+        resp = requests.post(GROQ_API_URL, json={
+            "model": MODEL_ID,
+            "messages": [{"role": "user", "content": "Say hi in one word"}],
+            "stream": False
+        }, headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {GROQ_API_KEY}"
+        }, timeout=15)
+        groq_time = time.time() - start
+        result = resp.json()['choices'][0]['message']['content']
+        return jsonify({
+            "groq_ok": True,
+            "response": result,
+            "time_seconds": round(groq_time, 2)
+        })
+    except Exception as e:
+        return jsonify({
+            "groq_ok": False,
+            "error": str(e),
+            "time_seconds": round(time.time() - start, 2)
+        }), 500
+
+
 @app.route('/tally-webhook', methods=['POST'])
 def tally_webhook():
     """Receive Tally submission and process report synchronously."""
