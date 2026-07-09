@@ -260,38 +260,9 @@ def extract_email(tally_data):
     return None
 
 
-def background_workflow(data, recipient_email):
-    """Process submission: push to HubSpot, generate report, send email."""
-    print(f"[WORKFLOW] Processing for {recipient_email}...")
-
-    # 1. Push to HubSpot immediately
-    push_to_hubspot(data, recipient_email)
-
-    # 2. Wait 5 minutes (feels human-curated, not instant bot)
-    # Only when running locally (not on Railway)
-    if os.getenv("RAILWAY_ENVIRONMENT_NAME"):
-        print(f"[WORKFLOW] Railway mode — generating report immediately for {recipient_email}...")
-    else:
-        print(f"[WORKFLOW] Local mode — waiting 5 minutes for {recipient_email}...")
-        time.sleep(300)
-
-    start = time.time()
-
-    # 3. Calculate AI Efficiency Score
-    efficiency_score = calculate_efficiency_score(data)
-    print(f"[SCORE] AI Efficiency Score: {efficiency_score}/100")
-
-    ai_report = generate_ai_report(data, efficiency_score)
-
-    subject = "Your AI Efficiency Report — ImplementAI Labs"
-    send_email(subject, ai_report, recipient_email)
-
-    elapsed = time.time() - start
-    print(f"[DONE] {recipient_email} processed in {elapsed:.1f}s")
-
-
 @app.route('/tally-webhook', methods=['POST'])
 def tally_webhook():
+    """Receive Tally submission and process report synchronously."""
     data = request.json
     recipient_email = extract_email(data)
 
@@ -299,14 +270,39 @@ def tally_webhook():
         print(f"[WARN] No email found in: {json.dumps(data)[:200]}")
         return jsonify({"status": "error", "message": "Email not found"}), 400
 
-    # Process in background so Tally gets instant 200
-    thread = threading.Thread(target=background_workflow, args=(data, recipient_email))
-    thread.start()
+    print(f"[WEBHOOK] Processing for {recipient_email}...")
 
-    return jsonify({
-        "status": "received",
-        "message": f"Processing report for {recipient_email}. Email will be sent shortly."
-    }), 200
+    try:
+        # 1. Push to HubSpot immediately
+        push_to_hubspot(data, recipient_email)
+
+        start = time.time()
+
+        # 2. Calculate AI Efficiency Score
+        efficiency_score = calculate_efficiency_score(data)
+        print(f"[SCORE] AI Efficiency Score: {efficiency_score}/100")
+
+        # 3. Generate AI report (no thread — process inline)
+        ai_report = generate_ai_report(data, efficiency_score)
+
+        # 4. Send email
+        subject = "Your AI Efficiency Report — ImplementAI Labs"
+        send_email(subject, ai_report, recipient_email)
+
+        elapsed = time.time() - start
+        print(f"[DONE] {recipient_email} processed in {elapsed:.1f}s")
+
+        return jsonify({
+            "status": "success",
+            "message": f"Report sent to {recipient_email}"
+        }), 200
+
+    except Exception as e:
+        print(f"[ERROR] {recipient_email}: {e}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 
 @app.route('/debug-env', methods=['GET'])
