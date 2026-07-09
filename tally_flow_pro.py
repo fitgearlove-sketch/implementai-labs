@@ -57,6 +57,9 @@ Based on their manual hours, calculate annual waste. Factor in their growth stag
 - Phase 2 (Days 31-60): Foundation building — integrations and SOP documentation
 - Phase 3 (Days 61-90): Advanced optimization
 
+### Your AI Efficiency Score
+Show their score prominently at the top of the report. A score of 0-30 means critical inefficiencies, 31-60 means moderate gaps, 61-80 means decent but room to improve, 81-100 means highly optimized. Use this to create urgency: the lower the score, the more they're leaving on the table.
+
 ### Next Steps
 Personalized based on their timeline and implementation interest. If they opted in for a Deep Diagnostic, include a prominent call-to-action for that.
 
@@ -69,18 +72,19 @@ Book a free 30-minute Diagnostic Call here: """ + CALENDLY_URL + """
 We'll walk through this roadmap together, answer your questions, and help you determine the best path forward."""
 
 
-def generate_ai_report(tally_data):
+def generate_ai_report(tally_data, efficiency_score):
     """Sends Tally data to Groq AI and returns AI-generated report."""
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {GROQ_API_KEY}"
     }
+    score_context = f"\n\n**AI Efficiency Score for this agency: {efficiency_score}/100**"
     payload = {
         "model": MODEL_ID,
         "stream": False,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Here is the raw Tally form submission data. Generate the personalized report:\n\n{json.dumps(tally_data, indent=2)}"}
+            {"role": "user", "content": f"Here is the raw Tally form submission data. Generate the personalized report:\n\n{json.dumps(tally_data, indent=2)}" + score_context}
         ]
     }
     try:
@@ -114,6 +118,50 @@ def send_email(subject, body, recipient_email):
     except Exception as e:
         print(f"[ERROR] Email to {recipient_email}: {e}")
         return False
+
+
+def calculate_efficiency_score(tally_data):
+    """Calculate AI Efficiency Score (0-100) from form responses."""
+    manual_hours = (extract_field(tally_data, 'manual reporting') or
+                    extract_field(tally_data, 'hours per week') or '')
+    sop_raw = extract_field(tally_data, 'sop') or extract_field(tally_data, 'documented') or ''
+    lead_handling = extract_field(tally_data, 'lead') or ''
+    growth_stage = extract_field(tally_data, 'current situation') or ''
+
+    # Manual hours score (weight: 35)
+    manual_hours = str(manual_hours).strip()
+    if '0–5' in manual_hours: m_score = 35
+    elif '6–15' in manual_hours: m_score = 25
+    elif '16–30' in manual_hours: m_score = 10
+    elif '30+' in manual_hours: m_score = 0
+    else: m_score = 15  # default mid
+
+    # SOP score (weight: 25)
+    try:
+        sop_val = int(str(sop_raw).strip())
+        sop_score = max(0, min(25, sop_val * 2.5))
+    except:
+        sop_score = 12.5
+
+    # Lead handling (weight: 20)
+    lh = str(lead_handling).strip().lower()
+    if 'ai' in lh: l_score = 20
+    elif 'auto' in lh: l_score = 12
+    elif 'manual' in lh: l_score = 5
+    elif 'no consistent' in lh: l_score = 0
+    else: l_score = 8
+
+    # Growth stage (weight: 20)
+    gs = str(growth_stage).strip().lower()
+    if 'stable' in gs: g_score = 20
+    elif 'growing steady' in gs: g_score = 15
+    elif 'plateau' in gs: g_score = 10
+    elif 'rapid' in gs: g_score = 5
+    elif 'struggling' in gs: g_score = 5
+    else: g_score = 10
+
+    total = round(m_score + sop_score + l_score + g_score)
+    return max(0, min(100, total))
 
 
 def extract_field(tally_data, label_match):
@@ -225,7 +273,11 @@ def background_workflow(data, recipient_email):
 
     start = time.time()
 
-    ai_report = generate_ai_report(data)
+    # 3. Calculate AI Efficiency Score
+    efficiency_score = calculate_efficiency_score(data)
+    print(f"[SCORE] AI Efficiency Score: {efficiency_score}/100")
+
+    ai_report = generate_ai_report(data, efficiency_score)
 
     subject = "Your AI Efficiency Report — ImplementAI Labs"
     send_email(subject, ai_report, recipient_email)

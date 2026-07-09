@@ -57,6 +57,8 @@ Maps directly to Tally form responses (https://tally.so/r/dWkvgz). Questions ref
 
 ```json
 {
+  "efficiency_score": "[0-100 calculated by Python script]",
+  "score_rating": "[0-30: Critical | 31-60: Needs Work | 61-80: Fair | 81-100: Optimized]",
   "estimated_hourly_rate": "$60-75",
   "weekly_waste_hours": "[Midpoint of manual_hours_weekly range]",
   "monthly_waste_amount": "[weekly_waste_hours × $65 × 4.3]",
@@ -64,6 +66,18 @@ Maps directly to Tally form responses (https://tally.so/r/dWkvgz). Questions ref
   "lead_quality": "[A | B | C based on scoring logic]",
   "team_size_tier": "[small: 1-10 | medium: 11-25 | large: 26+]"
 }
+```
+
+### AI Efficiency Score Formula (Python, not AI)
+Computed server-side before the AI prompt runs:
+
+```
+Score = Manual Hours (0-35) + SOP Documentation (0-25) + Lead Handling (0-20) + Growth Stage (0-20)
+
+Manual hours: 0-5h = 35 pts, 6-15h = 25 pts, 16-30h = 10 pts, 30+ = 0 pts
+SOP: score * 2.5 (0-10 scale → 0-25 pts)
+Lead handling: AI-powered = 20, Auto-reply = 12, Manual = 5, None = 0
+Growth stage: Stable = 20, Growing steadily = 15, Plateaued = 10, Rapid = 5, Struggling = 5
 ```
 
 ## Output Template Structure
