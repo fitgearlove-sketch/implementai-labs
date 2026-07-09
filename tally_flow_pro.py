@@ -389,6 +389,7 @@ def debug_env():
         "groq_key_prefix": GROQ_API_KEY[:7] + "..." if GROQ_API_KEY else "none",
         "sender_email": SENDER_EMAIL,
         "resend_configured": bool(RESEND_API_KEY),
+        "resend_key_prefix": RESEND_API_KEY[:7] + "..." if RESEND_API_KEY else "none",
         "hubspot_configured": bool(HUBSPOT_API_KEY),
         "model": MODEL_ID,
         "port": PORT,
