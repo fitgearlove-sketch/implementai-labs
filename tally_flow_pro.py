@@ -101,20 +101,22 @@ def send_email(subject, body, recipient_email):
         print(f"[SKIP] --- BEGIN REPORT ---\n{body}\n--- END REPORT ---")
         return False
     try:
-        resp = requests.post("https://api.resend.com/emails", json={
+        payload = {
             "from": f"ImplementAI Labs <{SENDER_EMAIL}>",
             "to": recipient_email,
             "subject": subject,
             "text": body
-        }, headers={
+        }
+        print(f"[EMAIL] Sending to {recipient_email} via Resend...")
+        resp = requests.post("https://api.resend.com/emails", json=payload, headers={
             "Authorization": f"Bearer {RESEND_API_KEY}",
             "Content-Type": "application/json"
-        }, timeout=15)
+        }, timeout=30)
         if resp.status_code == 200:
-            print(f"[OK] Report sent to {recipient_email}")
+            print(f"[OK] Report sent to {recipient_email} (id: {resp.json().get('id', '?')})")
             return True
         else:
-            print(f"[ERROR] Resend API: {resp.status_code} {resp.text[:200]}")
+            print(f"[ERROR] Resend API: {resp.status_code} {resp.text[:300]}")
             return False
     except Exception as e:
         print(f"[ERROR] Email to {recipient_email}: {e}")
@@ -329,15 +331,17 @@ def tally_webhook():
 
         # 4. Send email
         subject = "Your AI Efficiency Report — ImplementAI Labs"
-        send_email(subject, ai_report, recipient_email)
+        email_ok = send_email(subject, ai_report, recipient_email)
+        if not email_ok:
+            print(f"[ERROR] Failed to send email to {recipient_email}")
 
         elapsed = time.time() - start
         print(f"[DONE] {recipient_email} processed in {elapsed:.1f}s")
 
         return jsonify({
-            "status": "success",
-            "message": f"Report sent to {recipient_email}"
-        }), 200
+            "status": "success" if email_ok else "email_failed",
+            "message": f"Report {'sent' if email_ok else 'generated but email failed'} for {recipient_email}"
+        }), 200 if email_ok else 500
 
     except Exception as e:
         print(f"[ERROR] {recipient_email}: {e}")
