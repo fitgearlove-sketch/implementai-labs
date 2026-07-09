@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ImplementAI Labs: Tally Webhook → 9router AI → Email"""
+"""ImplementAI Labs: Tally Webhook → Groq AI → Email → HubSpot"""
 
 import os, json, requests, time, threading
 from flask import Flask, request, jsonify
@@ -9,8 +9,9 @@ from email.mime.text import MIMEText
 app = Flask(__name__)
 
 # --- CONFIGURATION (from env vars) ---
-NINE_ROUTER_URL = os.getenv("NINE_ROUTER_URL", "http://localhost:20128/v1/chat/completions")
-MODEL_ID = os.getenv("MODEL_ID", "oc/deepseek-v4-flash-free")
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+MODEL_ID = os.getenv("MODEL_ID", "llama-3.3-70b-versatile")
 PORT = int(os.getenv("PORT", 5001))
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
@@ -69,8 +70,11 @@ We'll walk through this roadmap together, answer your questions, and help you de
 
 
 def generate_ai_report(tally_data):
-    """Sends Tally data to 9router and returns AI-generated report."""
-    headers = {"Content-Type": "application/json"}
+    """Sends Tally data to Groq AI and returns AI-generated report."""
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {GROQ_API_KEY}"
+    }
     payload = {
         "model": MODEL_ID,
         "stream": False,
@@ -80,19 +84,12 @@ def generate_ai_report(tally_data):
         ]
     }
     try:
-        response = requests.post(NINE_ROUTER_URL, json=payload, headers=headers, timeout=120)
+        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=120)
         response.raise_for_status()
-        # Handle both clean JSON and streaming responses (Groq adds data: [DONE])
-        raw = response.text.strip()
-        if raw.startswith('{'):
-            data = json.loads(raw)
-        else:
-            # strip streaming artifacts, take first JSON object
-            lines = [l for l in raw.split('\n') if l.startswith('{')]
-            data = json.loads(lines[0])
+        data = response.json()
         return data['choices'][0]['message']['content']
     except requests.exceptions.Timeout:
-        return "Error: AI request timed out after 60 seconds."
+        return "Error: AI request timed out after 120 seconds."
     except Exception as e:
         return f"Error generating report: {str(e)}"
 
@@ -264,9 +261,9 @@ def health():
 if __name__ == '__main__':
     print(f"""
     ╔══════════════════════════════════════════════════╗
-    ║  ImplementAI Labs — Automation Server          ║
-    ║  Port: {PORT}                                        ║
-    ║  Model: {MODEL_ID}                ║
+    ║  ImplementAI Labs — Automation Server           ║
+    ║  Port: {PORT}                                         ║
+    ║  AI: Groq {MODEL_ID}                                 ║
     ║  Webhook: /tally-webhook                          ║
     ║  Health: /health                                     ║
     ╚══════════════════════════════════════════════════╝
