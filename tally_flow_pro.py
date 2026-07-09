@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """ImplementAI Labs: Tally Webhook → Groq AI → Email → HubSpot"""
 
-import os, json, requests, time, threading
+import os, json, requests, time
 from flask import Flask, request, jsonify
-import smtplib
-from email.mime.text import MIMEText
 
 app = Flask(__name__)
 
@@ -13,10 +11,8 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 MODEL_ID = os.getenv("MODEL_ID", "llama-3.3-70b-versatile")
 PORT = int(os.getenv("PORT", 5001))
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "your-email@gmail.com")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 AUDIT_FORM_URL = os.getenv("AUDIT_FORM_URL", "https://tally.so/r/dWkvgz")
 HUBSPOT_API_KEY = os.getenv("HUBSPOT_API_KEY", "")
 CALENDLY_URL = os.getenv("CALENDLY_URL", "https://calendly.com/fitgearlove/diagnostic-call")
@@ -99,22 +95,27 @@ def generate_ai_report(tally_data, efficiency_score):
 
 
 def send_email(subject, body, recipient_email):
-    """Sends the report via SMTP."""
-    if not SENDER_EMAIL or not SENDER_PASSWORD:
-        print(f"[SKIP] SMTP not configured. Report would be sent to {recipient_email}")
+    """Sends the report via Resend API."""
+    if not RESEND_API_KEY:
+        print(f"[SKIP] Resend not configured. Report would be sent to {recipient_email}")
         print(f"[SKIP] --- BEGIN REPORT ---\n{body}\n--- END REPORT ---")
         return False
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = recipient_email
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SENDER_EMAIL, SENDER_PASSWORD)
-            server.send_message(msg)
-        print(f"[OK] Report sent to {recipient_email}")
-        return True
+        resp = requests.post("https://api.resend.com/emails", json={
+            "from": f"ImplementAI Labs <{SENDER_EMAIL}>",
+            "to": recipient_email,
+            "subject": subject,
+            "text": body
+        }, headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json"
+        }, timeout=15)
+        if resp.status_code == 200:
+            print(f"[OK] Report sent to {recipient_email}")
+            return True
+        else:
+            print(f"[ERROR] Resend API: {resp.status_code} {resp.text[:200]}")
+            return False
     except Exception as e:
         print(f"[ERROR] Email to {recipient_email}: {e}")
         return False
@@ -353,7 +354,7 @@ def debug_env():
         "groq_key_set": bool(GROQ_API_KEY),
         "groq_key_prefix": GROQ_API_KEY[:7] + "..." if GROQ_API_KEY else "none",
         "sender_email": SENDER_EMAIL,
-        "smtp_configured": bool(SENDER_PASSWORD),
+        "resend_configured": bool(RESEND_API_KEY),
         "hubspot_configured": bool(HUBSPOT_API_KEY),
         "model": MODEL_ID,
         "port": PORT,
