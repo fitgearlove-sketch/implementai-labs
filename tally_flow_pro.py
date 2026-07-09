@@ -263,6 +263,36 @@ def extract_email(tally_data):
     return None
 
 
+@app.route('/test-resend', methods=['GET'])
+def test_resend():
+    """Diagnose Resend API exact error."""
+    import traceback
+    try:
+        payload = {
+            "from": f"ImplementAI Labs <onboarding@resend.dev>",
+            "to": "fitgearlove@gmail.com",
+            "subject": "Resend Test from Railway",
+            "text": "Diagnosing Resend API issues on Railway."
+        }
+        resp = requests.post("https://api.resend.com/emails", json=payload, headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}" if RESEND_API_KEY else "none",
+            "Content-Type": "application/json"
+        }, timeout=30)
+        return jsonify({
+            "resend_key_set": bool(RESEND_API_KEY),
+            "resend_key_prefix": RESEND_API_KEY[:7] if RESEND_API_KEY else "none",
+            "status_code": resp.status_code,
+            "response_body": resp.text[:500],
+            "response_headers": dict(resp.headers)
+        })
+    except Exception as e:
+        return jsonify({
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 @app.route('/test-email', methods=['GET'])
 def test_email():
     """Isolated test: send a simple email."""
