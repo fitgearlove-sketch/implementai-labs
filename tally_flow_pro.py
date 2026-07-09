@@ -261,15 +261,19 @@ def extract_email(tally_data):
 
 
 def background_workflow(data, recipient_email):
-    """Background thread: push to HubSpot, wait 5 min, generate report, send email."""
+    """Process submission: push to HubSpot, generate report, send email."""
     print(f"[WORKFLOW] Processing for {recipient_email}...")
 
     # 1. Push to HubSpot immediately
     push_to_hubspot(data, recipient_email)
 
     # 2. Wait 5 minutes (feels human-curated, not instant bot)
-    print(f"[WORKFLOW] Waiting 5 minutes before generating report for {recipient_email}...")
-    time.sleep(300)
+    # Only when running locally (not on Railway)
+    if os.getenv("RAILWAY_ENVIRONMENT_NAME"):
+        print(f"[WORKFLOW] Railway mode — generating report immediately for {recipient_email}...")
+    else:
+        print(f"[WORKFLOW] Local mode — waiting 5 minutes for {recipient_email}...")
+        time.sleep(300)
 
     start = time.time()
 
